@@ -142,6 +142,18 @@ class _image_size
             }
         }
 
+        // すべてOFF
+        if (isset($_POST['all_off'])) {
+            if ($_POST['all_off'] === "1") {
+                foreach ($data as $key => $val) {
+                    $data[$key]['flug'] = false;
+                }
+                _options::update('all_off', '1');
+            }
+        } else {
+            _options::update('all_off', '0');
+        }
+
         // データを分ける
         $regular = [];
         $added = [];
@@ -238,6 +250,10 @@ class _image_size
                 $added[$size_name]['org_w'] = $vals['width'];
                 $added[$size_name]['org_h'] = $vals['height'];
                 $added[$size_name]['type'] = 'added';
+                // 全てOFFの時
+                if (_options::get('all_off') === '1') {
+                    $added[$size_name]['flug'] === 0;
+                }
             }
         }
 

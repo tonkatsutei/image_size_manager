@@ -56,8 +56,14 @@ class _control_panel
                     'width'  => $vals['width'],
                     'height' => $vals['height'],
                     'crop'   => $vals['crop'],
-                    'flug'   => true,
                 ];
+                // 全てOFFの時
+                if (_options::get('all_off') === '1') {
+                    $data[$key]['flug'] = 0;
+                } else {
+                    $data[$key]['flug'] = 1;
+                }
+
                 _image_size::update_added_image_sizes($data);
             }
         }
@@ -65,6 +71,15 @@ class _control_panel
         // 保存値を取得
         // 更新の場合は更新済みの値がセットされている
         $image_sizes = self::get_saved_value();
+
+        // すべてOFF
+        $all_off = _options::get('all_off');
+        if ($all_off === '1') {
+            $v['all_off_check'] = 'checked="checked"';
+        } else {
+            $v['all_off_check'] = '';
+        }
+
 
         // 表示用TABLE
         $table_html = "<table name='usable_image_sizes'>";
@@ -196,11 +211,13 @@ class _control_panel
                 <div>
                     利用しているテーマやプラグインによって、ここに表示されるサイズは違います。<br>
                     OFFにすると以降の投稿時にサムネイルファイルが生成されなくなります。<br>
+                    <span class="dashicons dashicons-wordpress" style="font-size:1.2em"></span>マークのサイズをOFFにした場合 width, heightの値は0になります。<br>
                     <span class='comment'>設定を変更しても既に生成済みの画像には影響しません。</span>
                 </div>
                 {$v['table']}
-                <div class='comment'>
-                    <span class="dashicons dashicons-wordpress"></span>マークのサイズをOFFにした場合 width, heightの値は0になります。<br>
+                <div>
+                    　　<input type='checkbox' name='all_off' value='1' {$v['all_off_check']}>
+                    今後追加されるサイズも含めてすべてOFFにする。
                 </div>
                 <button type="submit" name="settei" value="on">更 新</button>
             </div>

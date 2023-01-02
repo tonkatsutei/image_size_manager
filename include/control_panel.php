@@ -27,12 +27,33 @@ class _control_panel
 
     public static function control_panel_html(): void
     {
+        // RESETボタンを押した場合
+        if (isset($_POST['reset'])) {
+            _options::update('added_image_size', '');
+            unset($_POST['all_off']);
+            unset($_POST['delete_unused']);
+            _options::update('all_off', '0');
+            _options::update('delete_unused', '0');
+            $v["settei_res"] = <<<EOD
+                <div style="padding:1em;">
+                    リセットしました。
+                </div>
+            EOD;
+        } else {
+            $v["settei_res"] = '';
+        }
+
+        // 初回起動 & RESET
+        $s = _options::get('added_image_size');
+        if ($s === false || $s === '') {
+            _image_size::first_time();
+        }
+
         // 更新ボタンを押した場合
         if (isset($_POST['settei'])) {
             // POSTデータから保存値を更新
-            _image_size::update_control_panel();
-            // 更新値を反映
-            _image_size::apply_setting();
+            // 以降の処理でsize_nameを使うので戻り値を取る
+            $img_sizes = _image_size::update_control_panel();
             $v["settei_res"] = <<<EOD
                 <div style="padding:1em;">
                     更新しました。<br>
@@ -40,46 +61,100 @@ class _control_panel
                 </div>
             EOD;
         } else {
-            $v["settei_res"] = '';
+            $img_sizes = _image_size::get_saved_value();
         }
 
-        // 現在利用可能な追加アイキャッチ
-        $additional_image_sizes = wp_get_additional_image_sizes();
-
-        // 現在当プラグインで管理している追加アイキャッチ
-        $added = _image_size::get_added_image_sizes();
-
-        // 当プラグインでの未設定のときは追加
-        foreach ($additional_image_sizes as $key => $vals) {
-            if (!array_key_exists($key, $added)) {
-                $data[$key] = [
-                    'width'  => $vals['width'],
-                    'height' => $vals['height'],
-                    'crop'   => $vals['crop'],
-                ];
-                // 全てOFFの時
-                if (_options::get('all_off') === '1') {
-                    $data[$key]['flug'] = 0;
-                } else {
-                    $data[$key]['flug'] = 1;
-                }
-
-                _image_size::update_added_image_sizes($data);
+        // すべてOFFと未使用削除のチェックマーク
+        if (isset($_POST['settei']) === false) {
+            if (_options::get('all_off') === '1') {
+                $_POST['all_off'] = '1';
+            }
+            if (_options::get('delete_unused') === '1') {
+                $_POST['delete_unused'] = '1';
             }
         }
 
-        // 保存値を取得
-        // 更新の場合は更新済みの値がセットされている
-        $image_sizes = self::get_saved_value();
+        // 個別に初期化
+        $img_sizes = _image_size::initialize($img_sizes);
 
-        // すべてOFF
+        // 未管理のサイズを追加
+        $img_sizes['added'] = _image_size::add_added_image_sizes($img_sizes['added']);
+
+        // 使用中か未使用かを追加
+        $img_sizes = _image_size::is_use_size($img_sizes);
+
+        // 全てOFFの場合
+        if (isset($_POST['all_off'])) {
+            $img_sizes = _image_size::all_off($img_sizes);
+            _options::update('all_off', '1');
+        } else {
+            _options::update('all_off', '0');
+        }
+
+        // 未使用を削除の場合
+        if (isset($_POST['delete_unused'])) {
+            $img_sizes['added'] = _image_size::delete_unused($img_sizes['added']);
+            _options::update('delete_unused', '1');
+        } else {
+            _options::update('delete_unused', '0');
+        }
+
+        // 標準アイキャッチのDBを更新
+        _image_size::update_regular_image_sizes($img_sizes['regular']);
+
+        // 追加アイキャッチのDBを更新
+        _image_size::update_added_image_sizes($img_sizes['added']);
+
+        // HTML生成
+        $html = self::generate_html($img_sizes, $v);
+
+        // 表示
+        print $html;
+    }
+
+    // HTML生成
+    public static function generate_html(array $img_sizes, array $v): string
+    {
+        // すべてOFFのチェックマーク
         $all_off = _options::get('all_off');
         if ($all_off === '1') {
             $v['all_off_check'] = 'checked="checked"';
         } else {
             $v['all_off_check'] = '';
         }
+        print "all_off_check => " . $v['all_off_check'] . "<br>";
 
+        // 未使用を削除のチェックマーク
+        $delete_unused = _options::get('delete_unused');
+        if ($delete_unused === '1') {
+            $v['delete_unused_check'] = 'checked="checked"';
+        } else {
+            $v['delete_unused_check'] = '';
+        }
+
+        // サイズ一覧テーブル
+        $v['table'] = self::generate_table_html($img_sizes);
+
+        // バージョン表記
+        $v['version'] = 'Ver.' . _common::plugin()['version'];
+
+        // HTML
+        $html  = self::html($v);
+        $html .= self::main_style($v);
+        $html .= self::dark_mode_style($v);
+
+        return $html;
+    }
+
+    // TABLE生成
+    public static function generate_table_html(array $img_sizes): string
+    {
+        // regularとaddedを統合
+        foreach ($img_sizes as $i => $vals) {
+            foreach ($vals as $key => $val) {
+                $data[$key] = $val;
+            }
+        }
 
         // 表示用TABLE
         $table_html = "<table name='usable_image_sizes'>";
@@ -94,58 +169,22 @@ class _control_panel
                             <th>初期化</th>
                         </tr>
                     EOF;
-        foreach ($image_sizes as $key => $val) {
-            $type = $val['type'];
-            $width = (int)$val['width'];
-            $height = (int)$val['height'];
-            $flug = (int)$val['flug'];
-            if ($flug === 1) {
-                $flug = true;
-            } else {
-                $flug = false;
-            }
-            $crop = (int)$val['crop'];
-            if ($crop === 1) {
-                $crop = true;
-            } else {
-                $crop = false;
-            }
-            $table_html .= self::usable_image_size_tr($type, $key, $flug, $width, $height, $crop);
+        foreach ($data as $key => $val) {
+            $type   = $val['type'];
+            $width  = $val['width'];
+            $height = $val['height'];
+            $flug   = $val['flug'];
+            $crop   = $val['crop'];
+            $used   = $val['used'];
+            $table_html .= self::generate_tr_html($type, $key, $flug, $width, $height, $crop, $used);
         }
         $table_html .= '</table>';
 
-        // フォームにセット
-        $v['table'] = $table_html;
-        //$v['name'] = str_replace('_', ' ', _common::plugin()['name']);
-        $v['version'] = 'Ver.' . _common::plugin()['version'];
-
-        // HTML
-        $code = self::html($v);
-        $code .= self::main_style($v);
-        $code .= self::dark_mode_style($v);
-
-        print $code;
+        return $table_html;
     }
 
-    // 保存値
-    private static function get_saved_value(): array
-    {
-        // 標準アイキャッチ
-        $array = _image_size::get_regular_image_sizes();
-        foreach ($array as $key => $val) {
-            $image_size[$key] = $val;
-        }
-
-        // 追加アイキャッチ
-        $added = _image_size::get_added_image_sizes();
-        foreach ($added as $key => $val) {
-            $image_size[$key] = $val;
-        }
-
-        return $image_size;
-    }
-
-    private static function usable_image_size_tr(string $type, string $name, bool $flug, int $width, int $height, bool $crop): string
+    // TR生成
+    private static function generate_tr_html(string $type, string $name, bool $flug, int $width, int $height, bool $crop, bool $used): string
     {
         if ($type === 'regular') {
             //$type_src = '<span class="dashicons dashicons-wordpress-alt"></span>';
@@ -172,6 +211,12 @@ class _control_panel
             $crop = 0;
         }
 
+        if ($used) {
+            $unuse_src = '';
+        } else {
+            $unuse_src = "class='unuse'";
+        }
+
         if ($type === 'regular' && $name !== 'thumbnail') {
             $crop_src = "<input type='text' value='0' style='text-align:center;color:#000;' disabled><input type='hidden' name='data_{$name}_c' value='0'>";
         } else {
@@ -181,7 +226,7 @@ class _control_panel
         $initialization_src = "<input type='checkbox' name='data_{$name}_i' value='1'>";
 
         return <<<EOD
-            <tr>
+            <tr {$unuse_src}>
                 <td>{$type_src}</td>
                 <td>{$name}</td>
                 <td>{$flug_src}</td>
@@ -197,7 +242,7 @@ class _control_panel
     {
         $prefix = "_" . _common::plugin()['name'];
         return <<<EOD
-            <form method="post" action="" enctype="multipart/form-data">
+            <form method="post" action="" name="ism_form" enctype="multipart/form-data">
             <div class="{$prefix}_wrap">
                 <div class="settei_res">{$v["settei_res"]}</div>
 
@@ -215,11 +260,19 @@ class _control_panel
                     <span class='comment'>設定を変更しても既に生成済みの画像には影響しません。</span>
                 </div>
                 {$v['table']}
-                <div>
-                    　　<input type='checkbox' name='all_off' value='1' {$v['all_off_check']}>
+                <div style='margin:10px 2em;'>
+                    <input type='checkbox' name='all_off' value='1' {$v['all_off_check']}>
                     今後追加されるサイズも含めてすべてOFFにする。
                 </div>
+                <div style='margin:10px 2em;'>
+                    <input type='checkbox' name='delete_unused' value='1' {$v['delete_unused_check']}>
+                    未使用サイズは Image Size Manager の管理データから削除する
+                </div>
                 <button type="submit" name="settei" value="on">更 新</button>
+                <button type="submit" name="reset" class="link-style-btn" value="1">
+                    <span class="dashicons dashicons-image-rotate"></span>
+                    RESET
+                </button>
             </div>
             </form>
         EOD;
@@ -290,6 +343,20 @@ class _control_panel
                 margin: 0 0 10px;
                 display: inline;
             }
+            .{$prefix}_wrap tr.unuse {
+                color:#54636f;
+            }
+
+            .{$prefix}_wrap button.link-style-btn{
+                cursor: pointer;
+                border: none;
+                background: none;
+                color: #c3c4c7;
+            }
+            .{$prefix}_wrap button.link-style-btn:hover{
+                color: #9ab3fd;
+            }
+
             </style>
         EOD;
     }

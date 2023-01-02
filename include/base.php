@@ -13,11 +13,17 @@ class _base
 {
     public static function plugin_on(): void
     {
+        // 「設定 > メディア」メニューを非表示に
+        add_action('admin_menu', 'tonkatsutei\image_size_manager\base\_base::remove_menus', 999);
+
         // 管理者メニュー
         add_action('admin_menu', 'tonkatsutei\image_size_manager\control_panel\_control_panel::show_admin_menu');
 
+        // 設定反映前の状態を退避
+        add_action('init', 'tonkatsutei\image_size_manager\image_size\_image_size::apply_prev_data_backup', 50000);
+
         // 設定を反映させる
-        add_action('init', 'tonkatsutei\image_size_manager\image_size\_image_size::apply_setting', 50000);
+        add_action('init', 'tonkatsutei\image_size_manager\image_size\_image_size::apply_setting', 50001);
     }
 
     public static function autoload(): void
@@ -26,6 +32,11 @@ class _base
         foreach ($files as $file) {
             require_once($file);
         }
+    }
+
+    public static function remove_menus(): void
+    {
+        remove_submenu_page('options-general.php', 'options-media.php');
     }
 }
 

@@ -171,8 +171,8 @@ class _control_panel
                     EOF;
         foreach ($data as $key => $val) {
             $type   = $val['type'];
-            $width  = $val['width'];
-            $height = $val['height'];
+            $width  = (int)$val['width'];
+            $height = (int)$val['height'];
             $flug   = $val['flug'];
             $crop   = $val['crop'];
             $used   = $val['used'];

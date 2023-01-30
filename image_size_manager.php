@@ -4,7 +4,7 @@ Plugin Name: Image Size Manager
 Plugin URI: https://manual.tonkatsutei.com/image_size_manager/
 Description: 利用しないサムネイルファイルの生成を停止します。
 Author: ton活亭
-Version: 1.2.6
+Version: 1.2.7
 Author URI: https://twitter.com/tonkatsutei
 */
 
@@ -33,7 +33,7 @@ require_once('include/base.php');
 
 // バージョン履歴
 $version_history = <<<EOD
-1.2.6
+1.2.7
 ・自動バージョンアップのテスト
 
 [Ver.1.2.4] 2023/01/11

@@ -34,6 +34,9 @@ require_once('include/base.php');
 
 // バージョン履歴
 $version_history = <<<EOD
+1.2.5
+・自動バージョンアップのテスト
+
 [Ver.1.2.4] 2023/01/11
 ・Agent_Tのアクセストークンを設定してしまっていたので修正
 

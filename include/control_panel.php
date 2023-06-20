@@ -28,7 +28,7 @@ class _control_panel
     public static function control_panel_html(): void
     {
         // RESETボタンを押した場合
-        if (isset($_POST['reset'])) {
+        if (isset($_POST['ism_reset'])) {
             _options::update('added_image_size', '');
             unset($_POST['all_off']);
             unset($_POST['delete_unused']);
@@ -50,7 +50,7 @@ class _control_panel
         }
 
         // 更新ボタンを押した場合
-        if (isset($_POST['settei'])) {
+        if (isset($_POST['ism_settei'])) {
             // POSTデータから保存値を更新
             // 以降の処理でsize_nameを使うので戻り値を取る
             $img_sizes = _image_size::update_control_panel();
@@ -65,7 +65,7 @@ class _control_panel
         }
 
         // すべてOFFと未使用削除のチェックマーク
-        if (isset($_POST['settei']) === false) {
+        if (isset($_POST['ism_settei']) === false) {
             if (_options::get('all_off') === '1') {
                 $_POST['all_off'] = '1';
             }
@@ -268,8 +268,8 @@ class _control_panel
                     <input type='checkbox' name='delete_unused' value='1' {$v['delete_unused_check']}>
                     未使用サイズは Image Size Manager の管理データから削除する
                 </div>
-                <button type="submit" name="settei" value="on">更 新</button>
-                <button type="submit" name="reset" class="link-style-btn" value="1">
+                <button type="submit" name="ism_settei" value="on">更 新</button>
+                <button type="submit" name="ism_reset" class="link-style-btn" value="1">
                     <span class="dashicons dashicons-image-rotate"></span>
                     RESET
                 </button>
